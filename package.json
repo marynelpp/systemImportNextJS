@@ -6,12 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:check": "node scripts/check-db.mjs",
+    "admin:create": "node scripts/admin.mjs",
+    "admin:reset": "node scripts/admin.mjs --reset",
+    "test": "node --experimental-strip-types --test tests/password.test.ts tests/bcv-parser.test.ts"
   },
   "dependencies": {
+    "@types/mssql": "^12.3.0",
+    "mssql": "^12.7.13",
     "next": "16.4.3",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -22,5 +29,8 @@
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

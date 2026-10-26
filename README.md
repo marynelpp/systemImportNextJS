@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nexo Import
 
-## Getting Started
+Sistema de gestión para una importadora China–Venezuela. Next.js, TypeScript y SQL Server. Primera etapa: landing, acceso, usuarios, roles y auditoría.
 
-First, run the development server:
+## Inicio
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Usar Node.js 24 (mínimo 22.13). Ejecutar `npm install` y `npm run dev`. Abrir http://localhost:3000.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La conexión privada vive en `.env.local`, excluido de Git. No compartir ni publicar ese archivo.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Habilitar el acceso
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Ejecutar los scripts de `database/` en orden: `001-seguridad.sql`, `002-invitaciones.sql` y `003-configuracion-monedas.sql`.
+2. Ejecutar `npm run db:check`.
+3. Ejecutar `npm run admin:create` para crear el administrador inicial con contraseña de entrada oculta.
+4. Iniciar sesión y crear invitaciones desde Usuarios. Cada persona recibe un enlace para definir su propia contraseña.
 
-## Learn More
+Sin servicio de correo, el panel muestra un enlace único para copiar. No lo compartas por canales públicos; cuando exista dominio y correo, ese mismo enlace se enviará automáticamente. `npm run admin:reset` permite restablecer una contraseña localmente, luego de verificar al solicitante.
 
-To learn more about Next.js, take a look at the following resources:
+## Validación
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`npm run lint`, `npm run build`, `npm test`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Ver `docs/IMPLEMENTACION.md` para el alcance, decisiones, estado de pruebas y limitaciones pendientes.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+La tasa USD/VES se registra desde Configuración con fecha de vigencia y fuente BCV o manual. Cada fecha conserva su propio historial.
