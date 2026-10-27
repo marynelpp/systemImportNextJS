@@ -1,0 +1,3 @@
+"use client";
+import { useState } from "react";
+export default function ProductGallery({productId,images}:{productId:number;images:{Id:number;NombreOriginal:string}[]}){const[selected,setSelected]=useState(images[0].Id);return <section className="product-gallery"><div className="product-thumbnails">{images.map(x=><button type="button" key={x.Id} onClick={()=>setSelected(x.Id)}><img src={`/api/productos/${productId}/imagenes/${x.Id}`} alt={x.NombreOriginal}/></button>)}</div><img className="product-main-image" src={`/api/productos/${productId}/imagenes/${selected}`} alt="Imagen del producto"/></section>}

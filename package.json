@@ -13,6 +13,7 @@
     "test": "node --experimental-strip-types --test tests/password.test.ts tests/bcv-parser.test.ts"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.34.0",
     "@types/mssql": "^12.3.0",
     "mssql": "^12.7.13",
     "next": "16.4.3",

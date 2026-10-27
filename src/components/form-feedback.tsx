@@ -1,0 +1,3 @@
+"use client";
+import { useEffect, useState } from "react";
+export default function FormFeedback({message,success}:{message:string;success?:boolean}){const[open,setOpen]=useState(Boolean(message));useEffect(()=>setOpen(Boolean(message)),[message]);if(!open||!message)return null;return <div className="feedback-backdrop" role="presentation"><section className={`feedback-modal ${success?"success":"error"}`} role="alertdialog"><span className="feedback-icon">{success?"✓":"!"}</span><div><strong>{success?"Operación realizada":"No pudimos completar la acción"}</strong><p>{message}</p></div><button type="button" onClick={()=>setOpen(false)} aria-label="Cerrar">×</button></section></div>}

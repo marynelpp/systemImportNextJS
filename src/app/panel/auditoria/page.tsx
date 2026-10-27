@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { formatVenezuelanDateTime } from "@/lib/dates";
 export default async function AuditPage() {
   await requireUser("auditoria.ver");
   const pool = await db(),
@@ -27,11 +28,7 @@ export default async function AuditPage() {
               {result.recordset.map((r) => (
                 <tr key={r.Id}>
                   <td>
-                    {new Intl.DateTimeFormat("es-VE", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                      timeZone: "America/Caracas",
-                    }).format(r.CreadoEn)}
+                    {formatVenezuelanDateTime(r.CreadoEn)}
                   </td>
                   <td>{r.Nombre ?? "Proceso de registro / local"}</td>
                   <td>{r.Accion}</td>

@@ -24,7 +24,7 @@ export default function Home() {
     <main>
       <header className="site-header container">
         <Link className="brand" href="/">
-          <span className="brand-mark">n.</span>NEXO <span>IMPORT</span>
+          <span className="brand-mark">n.</span>JJ <span>IMPORT</span>
         </Link>
         <nav>
           <a href="#operacion">La plataforma</a>
@@ -79,9 +79,9 @@ export default function Home() {
                 Destino<small>Venezuela</small>
               </span>
             </div>
-            <div className="cargo back">NEXO / CARGO</div>
+            <div className="cargo back">JJ / CARGO</div>
             <div className="cargo front">
-              NEXO / IMPORT <b>↗</b>
+              JJ / IMPORT <b>↗</b>
             </div>
           </div>
           <div className="journey-card">
@@ -174,7 +174,7 @@ export default function Home() {
       </section>
       <footer className="container footer">
         <Link className="brand" href="/">
-          <span className="brand-mark">n.</span>NEXO IMPORT
+          <span className="brand-mark">n.</span>JJ IMPORT
         </Link>
         <span>De origen a destino. Todo conectado.</span>
         <small>© {new Date().getFullYear()} Nexo Import</small>

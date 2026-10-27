@@ -8,7 +8,7 @@ export default function AuthLayout({
     <main className="auth-shell">
       <aside className="auth-aside">
         <Link className="brand" href="/">
-          <span className="brand-mark">n.</span>NEXO IMPORT
+          <span className="brand-mark">n.</span>JJ IMPORT
         </Link>
         <div>
           <div className="eyebrow">DE ORIGEN A DESTINO</div>
