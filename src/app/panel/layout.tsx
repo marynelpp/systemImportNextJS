@@ -39,6 +39,14 @@ export default async function PanelLayout({
     { href: "/panel/proveedores", label: "◇   Proveedores", show: can(user, "proveedores.ver") },
     { href: "/panel/compras", label: "▣   Compras", show: can(user, "compras.ver") },
     { href: "/panel/importaciones", label: "✈   Importaciones", show: can(user, "compras.ver") },
+    { href: "/panel/inventario", label: "▤   Inventario", show: can(user, "inventario.ver") },
+    { href: "/panel/alertas", label: "⚠   Alertas", show: can(user, "inventario.ver") },
+    { href: "/panel/clientes", label: "♧   Clientes", show: can(user, "clientes.ver") },
+    { href: "/panel/pedidos", label: "▧   Pedidos y ventas", show: can(user, "pedidos.ver") },
+    { href: "/panel/entregas", label: "▣   Entregas", show: can(user, "pedidos.ver") },
+    { href: "/panel/caja", label: "▤   Caja y cobros", show: can(user, "pedidos.ver") },
+    { href: "/panel/reportes", label: "◫   Reportes", show: can(user, "pedidos.ver") },
+    { href: "/panel/rotacion", label: "↗   Rotación", show: can(user, "pedidos.ver") },
   ];
 
   const mobileNavigation = navigation
@@ -64,8 +72,7 @@ export default async function PanelLayout({
           {renderNavigationLinks()}
           {[
 
-            "Inventario",
-            "Clientes y pedidos",
+            "Pedidos y ventas",
             "Ventas y caja",
           ].map((t) => (
             <span key={t}>
