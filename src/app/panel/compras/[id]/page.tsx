@@ -7,14 +7,14 @@ import PurchaseLineForm from "@/components/purchase-line-form";
 const number = (value: number) => value.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default async function Order({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ producto?: string }> }) {
-  await requireUser("compras.ver");
+  const user=await requireUser("compras.ver");
   const [{ id: rawId }, { producto }] = await Promise.all([params, searchParams]);
   const id = Number(rawId), pool = await db(), suggestedProduct = Number(producto);
   const [header, lines, products, importation] = await Promise.all([
-    pool.request().input("id", sql.Int, id).query("SELECT o.*,pr.Nombre Proveedor FROM importadora.OrdenesCompra o JOIN importadora.Proveedores pr ON pr.Id=o.ProveedorId WHERE o.Id=@id"),
-    pool.request().input("id", sql.Int, id).query("SELECT d.*,x.Nombre Producto,x.Codigo FROM importadora.OrdenCompraDetalles d JOIN importadora.Productos x ON x.Id=d.ProductoId WHERE d.OrdenCompraId=@id ORDER BY d.Id"),
-    pool.request().query("SELECT Id,Codigo,Nombre FROM importadora.Productos WHERE Activo=1 ORDER BY Nombre"),
-    pool.request().input("id", sql.Int, id).query("SELECT Id,Codigo,Estado FROM importadora.Importaciones WHERE OrdenCompraId=@id")
+    pool.request().input("id", sql.Int, id).input("company",sql.Int,user.EmpresaId).query("SELECT o.*,pr.Nombre Proveedor FROM importadora.OrdenesCompra o JOIN importadora.Proveedores pr ON pr.Id=o.ProveedorId WHERE o.Id=@id AND o.EmpresaId=@company"),
+    pool.request().input("id", sql.Int, id).input("company",sql.Int,user.EmpresaId).query("SELECT d.*,x.Nombre Producto,x.Codigo FROM importadora.OrdenCompraDetalles d JOIN importadora.OrdenesCompra o ON o.Id=d.OrdenCompraId JOIN importadora.Productos x ON x.Id=d.ProductoId WHERE d.OrdenCompraId=@id AND o.EmpresaId=@company ORDER BY d.Id"),
+    pool.request().input("company",sql.Int,user.EmpresaId).query("SELECT Id,Codigo,Nombre FROM importadora.Productos WHERE EmpresaId=@company AND Activo=1 ORDER BY Nombre"),
+    pool.request().input("id", sql.Int, id).input("company",sql.Int,user.EmpresaId).query("SELECT i.Id,i.Codigo,i.Estado FROM importadora.Importaciones i JOIN importadora.OrdenesCompra o ON o.Id=i.OrdenCompraId WHERE i.OrdenCompraId=@id AND o.EmpresaId=@company")
   ]);
   const order = header.recordset[0];
   if (!order) return <p>Orden no encontrada.</p>;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { createWarehouse, saveCompany, syncBcvRate } from "@/app/actions/configuracion";
+import { createWarehouse, saveCompany, saveSalesMargins, syncBcvRate } from "@/app/actions/configuracion";
 
 type Company = {
   NombreLegal: string;
@@ -29,4 +29,9 @@ export function WarehouseForm() {
 export function BcvRateForm() {
   const [state, action, pending] = useActionState(syncBcvRate, { message: "" });
   return <form action={action} className="settings-form"><div className="bcv-sync"><span className="bcv-mark">BCV</span><div><strong>Consulta oficial USD/VES</strong><p>La tasa y la fecha de vigencia se leen directamente desde bcv.org.ve y se guardan en el historial.</p></div></div><button className="button" disabled={pending}>{pending ? "Consultando BCV…" : "Actualizar tasa desde BCV ↗"}</button><Feedback state={state} /></form>;
+}
+
+export function SalesMarginsForm({ margins }: { margins?: { MargenMayor: number; MargenDetal: number } }) {
+  const [state, action, pending] = useActionState(saveSalesMargins, { message: "" });
+  return <form action={action} className="settings-form"><div className="form-grid compact"><label className="field">Margen mayor (%)<input name="wholesaleMargin" type="number" min="0" max="99.99" step="0.01" required defaultValue={margins?.MargenMayor ?? 35}/></label><label className="field">Margen detal (%)<input name="retailMargin" type="number" min="0" max="99.99" step="0.01" required defaultValue={margins?.MargenDetal ?? 55}/></label></div><button className="button" disabled={pending}>{pending ? "Guardando…" : "Guardar márgenes"}</button><Feedback state={state}/></form>;
 }

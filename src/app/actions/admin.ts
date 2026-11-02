@@ -29,18 +29,22 @@ export async function createInvitation(_: InvitationState, data: FormData): Prom
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const result = await new sql.Request(transaction)
       .input("actor", sql.Int, actor.Id).input("name", sql.NVarChar(100), name)
-      .input("email", sql.NVarChar(254), email).input("role", sql.Int, roleId)
+      .input("email", sql.NVarChar(254), email).input("role", sql.Int, roleId).input("company", sql.Int, actor.EmpresaId)
       .input("password", sql.VarChar(200), placeholderHash).input("token", sql.Char(64), digest(token)).query(`
-        DECLARE @actorAdmin bit=(SELECT r.EsAdministrador FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) JOIN importadora.Roles r ON r.Id=u.RolId WHERE u.Id=@actor AND u.Estado='activo');
-        IF @actorAdmin IS NULL OR (@actorAdmin=0 AND NOT EXISTS(SELECT 1 FROM importadora.Usuarios u JOIN importadora.RolPermisos p ON p.RolId=u.RolId WHERE u.Id=@actor AND p.PermisoCodigo='usuarios.administrar')) THROW 50003,'Acceso denegado',1;
-        IF NOT EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role) THROW 50003,'Rol inexistente',1;
-        IF @actorAdmin=0 AND EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EsAdministrador=1) THROW 50003,'Rol no permitido',1;
-        IF @actorAdmin=0 AND EXISTS(SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@role EXCEPT SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@actor) THROW 50003,'Rol no permitido',1;
+        DECLARE @actorSystem bit=ISNULL((SELECT EsAdministradorSistema FROM importadora.Usuarios WITH(UPDLOCK,HOLDLOCK) WHERE Id=@actor AND Estado='activo'),0);
+        DECLARE @actorRole int=(SELECT RolId FROM importadora.UsuarioEmpresas WHERE UsuarioId=@actor AND EmpresaId=@company AND Activo=1);
+        DECLARE @actorAdmin bit=ISNULL((SELECT EsAdministrador FROM importadora.Roles WHERE Id=@actorRole),0);
+        IF @actorSystem=0 AND (@actorRole IS NULL OR (@actorAdmin=0 AND NOT EXISTS(SELECT 1 FROM importadora.RolPermisos WHERE RolId=@actorRole AND PermisoCodigo='usuarios.administrar'))) THROW 50003,'Acceso denegado',1;
+        IF NOT EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EmpresaId=@company) THROW 50003,'Rol inexistente',1;
+        IF @actorSystem=0 AND @actorAdmin=0 AND EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EsAdministrador=1) THROW 50003,'Rol no permitido',1;
+        IF @actorSystem=0 AND @actorAdmin=0 AND EXISTS(SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@role EXCEPT SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@actorRole) THROW 50003,'Rol no permitido',1;
+        IF LOWER(@email)=N'perazaperozo@gmail.com' THROW 50003,'Correo reservado para el administrador global',1;
         IF EXISTS(SELECT 1 FROM importadora.Usuarios WITH(UPDLOCK,HOLDLOCK) WHERE Email=@email) THROW 50003,'Correo registrado',1;
         INSERT importadora.Usuarios(Nombre,Email,PasswordHash,Estado,RolId) VALUES(@name,@email,@password,'pendiente',@role);
         DECLARE @userId int=CONVERT(int,SCOPE_IDENTITY());
+        INSERT importadora.UsuarioEmpresas(UsuarioId,EmpresaId,RolId) VALUES(@userId,@company,@role);
         INSERT importadora.InvitacionesUsuario(UsuarioId,TokenHash,CreadoPorUsuarioId,ExpiraEn) VALUES(@userId,@token,@actor,DATEADD(day,7,SYSUTCDATETIME()));
-        INSERT importadora.Auditoria(UsuarioId,Accion,EntidadId,Detalle) VALUES(@actor,'usuario.invitacion',@userId,CONCAT('Rol: ',@role));
+        INSERT importadora.Auditoria(EmpresaId,UsuarioId,Accion,EntidadId,Detalle) VALUES(@company,@actor,'usuario.invitacion',@userId,CONCAT('Rol: ',@role));
         SELECT @userId AS UsuarioId;`);
     await transaction.commit();
     if (!result.recordset[0]) return { message: "No se pudo crear la invitación." };
@@ -62,14 +66,16 @@ export async function resendInvitation(_: InvitationState, data: FormData): Prom
   try {
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const result = await new sql.Request(transaction)
-      .input("actor", sql.Int, actor.Id).input("user", sql.Int, userId).input("token", sql.Char(64), digest(token)).query(`
-        DECLARE @actorAdmin bit=(SELECT r.EsAdministrador FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) JOIN importadora.Roles r ON r.Id=u.RolId WHERE u.Id=@actor AND u.Estado='activo');
-        IF @actorAdmin IS NULL OR (@actorAdmin=0 AND NOT EXISTS(SELECT 1 FROM importadora.Usuarios u JOIN importadora.RolPermisos p ON p.RolId=u.RolId WHERE u.Id=@actor AND p.PermisoCodigo='usuarios.administrar')) THROW 50004,'Acceso denegado',1;
-        IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios WITH(UPDLOCK,HOLDLOCK) WHERE Id=@user AND Estado='pendiente') THROW 50004,'Usuario no pendiente',1;
-        IF @actorAdmin=0 AND EXISTS(SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@user EXCEPT SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@actor) THROW 50004,'Acceso superior',1;
+      .input("actor", sql.Int, actor.Id).input("user", sql.Int, userId).input("company", sql.Int, actor.EmpresaId).input("token", sql.Char(64), digest(token)).query(`
+        DECLARE @actorSystem bit=ISNULL((SELECT EsAdministradorSistema FROM importadora.Usuarios WITH(UPDLOCK,HOLDLOCK) WHERE Id=@actor AND Estado='activo'),0);
+        DECLARE @actorRole int=(SELECT RolId FROM importadora.UsuarioEmpresas WHERE UsuarioId=@actor AND EmpresaId=@company AND Activo=1);
+        DECLARE @actorAdmin bit=ISNULL((SELECT EsAdministrador FROM importadora.Roles WHERE Id=@actorRole),0);
+        IF @actorSystem=0 AND (@actorRole IS NULL OR (@actorAdmin=0 AND NOT EXISTS(SELECT 1 FROM importadora.RolPermisos WHERE RolId=@actorRole AND PermisoCodigo='usuarios.administrar'))) THROW 50004,'Acceso denegado',1;
+        IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) JOIN importadora.UsuarioEmpresas ue ON ue.UsuarioId=u.Id WHERE u.Id=@user AND u.Estado='pendiente' AND ue.EmpresaId=@company) THROW 50004,'Usuario no pendiente',1;
+        IF @actorSystem=0 AND @actorAdmin=0 AND EXISTS(SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=(SELECT RolId FROM importadora.UsuarioEmpresas WHERE UsuarioId=@user AND EmpresaId=@company) EXCEPT SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@actorRole) THROW 50004,'Acceso superior',1;
         UPDATE importadora.InvitacionesUsuario SET CanceladoEn=SYSUTCDATETIME() WHERE UsuarioId=@user AND UsadoEn IS NULL AND CanceladoEn IS NULL;
         INSERT importadora.InvitacionesUsuario(UsuarioId,TokenHash,CreadoPorUsuarioId,ExpiraEn) VALUES(@user,@token,@actor,DATEADD(day,7,SYSUTCDATETIME()));
-        INSERT importadora.Auditoria(UsuarioId,Accion,EntidadId) VALUES(@actor,'usuario.reinvitacion',@user);
+        INSERT importadora.Auditoria(EmpresaId,UsuarioId,Accion,EntidadId) VALUES(@company,@actor,'usuario.reinvitacion',@user);
         SELECT 1 AS Ok;`);
     await transaction.commit();
     if (!result.recordset[0]?.Ok) return { message: "No se pudo renovar la invitación." };
@@ -106,19 +112,18 @@ export async function updateUser(
       .input("id", sql.Int, id)
       .input("role", sql.Int, role)
       .input("status", sql.VarChar(12), status)
-      .input("actor", sql.Int, actor.Id).query(`
+      .input("actor", sql.Int, actor.Id).input("company", sql.Int, actor.EmpresaId).query(`
  SET XACT_ABORT ON; BEGIN TRANSACTION;
- DECLARE @admin bit=(SELECT r.EsAdministrador FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) JOIN importadora.Roles r ON r.Id=u.RolId WHERE u.Id=@actor AND u.Estado='activo');
- IF @admin IS NULL OR (@admin=0 AND NOT EXISTS(SELECT 1 FROM importadora.Usuarios u JOIN importadora.RolPermisos p ON p.RolId=u.RolId WHERE u.Id=@actor AND p.PermisoCodigo='usuarios.administrar')) THROW 50002,'Acceso denegado',1;
- IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios WITH(UPDLOCK,HOLDLOCK) WHERE Id=@id) THROW 50002,'Usuario inexistente',1;
- IF EXISTS(SELECT 1 FROM importadora.Usuarios u JOIN importadora.Roles r ON u.RolId=r.Id WHERE u.Id=@id AND r.EsAdministrador=1) THROW 50002,'Cuenta administradora protegida',1;
- IF NOT EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role) THROW 50002,'Rol inexistente',1;
- IF @admin=0 AND (EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EsAdministrador=1)
-  OR EXISTS(SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@role EXCEPT SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@actor)
-  OR EXISTS(SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@id EXCEPT SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.Usuarios u ON u.RolId=p.RolId WHERE u.Id=@actor)) THROW 50002,'No puedes administrar un acceso superior al tuyo',1;
- UPDATE importadora.Usuarios SET RolId=@role,Estado=@status,ActualizadoEn=SYSUTCDATETIME() WHERE Id=@id;
+ IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios WHERE Id=@actor AND EsAdministradorSistema=1) AND NOT EXISTS(SELECT 1 FROM importadora.UsuarioEmpresas ue JOIN importadora.Roles r ON r.Id=ue.RolId WHERE ue.UsuarioId=@actor AND ue.EmpresaId=@company AND ue.Activo=1 AND (r.EsAdministrador=1 OR EXISTS(SELECT 1 FROM importadora.RolPermisos WHERE RolId=ue.RolId AND PermisoCodigo='usuarios.administrar'))) THROW 50002,'Acceso denegado',1;
+ IF EXISTS(SELECT 1 FROM importadora.Usuarios WHERE Id=@id AND EsAdministradorSistema=1) THROW 50002,'Cuenta global protegida',1;
+ IF NOT EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EmpresaId=@company) THROW 50002,'Rol inexistente',1;
+ IF NOT EXISTS(SELECT 1 FROM importadora.UsuarioEmpresas WHERE UsuarioId=@id AND EmpresaId=@company) THROW 50002,'Usuario ajeno a esta empresa',1;
+ IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios WHERE Id=@actor AND EsAdministradorSistema=1) AND NOT EXISTS(SELECT 1 FROM importadora.UsuarioEmpresas ue JOIN importadora.Roles r ON r.Id=ue.RolId WHERE ue.UsuarioId=@actor AND ue.EmpresaId=@company AND ue.Activo=1 AND r.EsAdministrador=1) AND EXISTS(SELECT 1 FROM importadora.Roles WHERE Id=@role AND EsAdministrador=1) THROW 50002,'Rol no permitido',1;
+ IF NOT EXISTS(SELECT 1 FROM importadora.Usuarios WHERE Id=@actor AND EsAdministradorSistema=1) AND NOT EXISTS(SELECT 1 FROM importadora.UsuarioEmpresas ue JOIN importadora.Roles r ON r.Id=ue.RolId WHERE ue.UsuarioId=@actor AND ue.EmpresaId=@company AND ue.Activo=1 AND r.EsAdministrador=1) AND EXISTS(SELECT PermisoCodigo FROM importadora.RolPermisos WHERE RolId=@role EXCEPT SELECT p.PermisoCodigo FROM importadora.RolPermisos p JOIN importadora.UsuarioEmpresas ue ON ue.RolId=p.RolId WHERE ue.UsuarioId=@actor AND ue.EmpresaId=@company AND ue.Activo=1) THROW 50002,'Rol no permitido',1;
+ UPDATE importadora.UsuarioEmpresas SET RolId=@role,Activo=CASE WHEN @status='inactivo' THEN 0 ELSE 1 END WHERE UsuarioId=@id AND EmpresaId=@company;
+ IF @status IN ('activo','pendiente') UPDATE importadora.Usuarios SET Estado=@status,ActualizadoEn=SYSUTCDATETIME() WHERE Id=@id;
  DELETE importadora.Sesiones WHERE UsuarioId=@id;
- INSERT importadora.Auditoria(UsuarioId,Accion,EntidadId,Detalle) VALUES(@actor,'usuario.acceso',@id,CONCAT('Estado: ',@status,'; rol: ',@role));
+ INSERT importadora.Auditoria(EmpresaId,UsuarioId,Accion,EntidadId,Detalle) VALUES(@company,@actor,'usuario.acceso',@id,CONCAT('Empresa: ',@company,'; estado: ',@status,'; rol: ',@role));
  COMMIT; SELECT 1 Ok;`);
     if (!result.recordset?.[0]?.Ok) return { message: "No se pudo guardar." };
   } catch {
@@ -139,7 +144,7 @@ export async function saveRole(
 ): Promise<FormState> {
   const actor = await requireUser("roles.administrar");
   // Only a full administrator may change the permission graph itself.
-  if (!actor.EsAdministrador)
+  if (!actor.EsAdministrador && !actor.EsAdministradorSistema)
     return {
       message: "La configuración de permisos requiere un administrador.",
     };
@@ -160,24 +165,27 @@ export async function saveRole(
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     const check = await new sql.Request(transaction)
       .input("actor", sql.Int, actor.Id)
+      .input("company", sql.Int, actor.EmpresaId)
       .query(
-        "SELECT u.Id FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) JOIN importadora.Roles r ON r.Id=u.RolId WHERE u.Id=@actor AND u.Estado='activo' AND r.EsAdministrador=1",
+        "SELECT u.Id FROM importadora.Usuarios u WITH(UPDLOCK,HOLDLOCK) WHERE u.Id=@actor AND u.Estado='activo' AND (u.EsAdministradorSistema=1 OR EXISTS(SELECT 1 FROM importadora.UsuarioEmpresas ue JOIN importadora.Roles r ON r.Id=ue.RolId WHERE ue.UsuarioId=u.Id AND ue.EmpresaId=@company AND ue.Activo=1 AND r.EsAdministrador=1))",
       );
     if (!check.recordset.length) throw new Error("Forbidden");
     let roleId = id;
     if (id) {
       const r = await new sql.Request(transaction)
         .input("id", sql.Int, id)
+        .input("company", sql.Int, actor.EmpresaId)
         .input("name", sql.NVarChar(60), name)
         .query(
-          "UPDATE importadora.Roles SET Nombre=@name OUTPUT inserted.Id WHERE Id=@id AND EsAdministrador=0",
+          "UPDATE importadora.Roles SET Nombre=@name OUTPUT inserted.Id WHERE Id=@id AND EmpresaId=@company AND EsAdministrador=0",
         );
       if (!r.recordset.length) throw new Error("Protected role");
     } else {
       const r = await new sql.Request(transaction)
+        .input("company", sql.Int, actor.EmpresaId)
         .input("name", sql.NVarChar(60), name)
         .query(
-          "INSERT importadora.Roles(Nombre) OUTPUT inserted.Id VALUES(@name)",
+          "INSERT importadora.Roles(EmpresaId,Nombre,EsAdministrador) OUTPUT inserted.Id VALUES(@company,@name,0)",
         );
       roleId = r.recordset[0].Id;
     }
@@ -194,8 +202,9 @@ export async function saveRole(
     await new sql.Request(transaction)
       .input("actor", sql.Int, actor.Id)
       .input("id", sql.Int, roleId)
+      .input("company", sql.Int, actor.EmpresaId)
       .query(
-        "DELETE s FROM importadora.Sesiones s JOIN importadora.Usuarios u ON u.Id=s.UsuarioId WHERE u.RolId=@id; INSERT importadora.Auditoria(UsuarioId,Accion,EntidadId) VALUES(@actor,'rol.configuracion',@id)",
+        "DELETE s FROM importadora.Sesiones s JOIN importadora.UsuarioEmpresas ue ON ue.UsuarioId=s.UsuarioId WHERE ue.RolId=@id AND ue.EmpresaId=@company; INSERT importadora.Auditoria(EmpresaId,UsuarioId,Accion,EntidadId,Detalle) VALUES(@company,@actor,'rol.configuracion',@id,CONCAT('Empresa: ',@company))",
       );
     await transaction.commit();
   } catch {

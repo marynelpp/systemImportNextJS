@@ -14,6 +14,9 @@ export type SessionUser = {
   RolId: number;
   Rol: string;
   EsAdministrador: boolean;
+  EsAdministradorSistema: boolean;
+  EmpresaId: number;
+  Empresa: string;
   permissions: string[];
 };
 export async function currentUser(): Promise<SessionUser | null> {
@@ -22,9 +25,11 @@ export async function currentUser(): Promise<SessionUser | null> {
   const pool = await db();
   const result = await pool.request().input("hash", sql.Char(64), digest(token))
     .query(`
-    SELECT u.Id,u.Nombre,u.Email,u.RolId,r.Nombre Rol,r.EsAdministrador
+    SELECT u.Id,u.Nombre,u.Email,COALESCE(ue.RolId,u.RolId) RolId,r.Nombre Rol,r.EsAdministrador,u.EsAdministradorSistema,s.EmpresaId,e.NombreComercial Empresa
     FROM importadora.Sesiones s JOIN importadora.Usuarios u ON u.Id=s.UsuarioId
-    JOIN importadora.Roles r ON r.Id=u.RolId
+    LEFT JOIN importadora.UsuarioEmpresas ue ON ue.UsuarioId=u.Id AND ue.EmpresaId=s.EmpresaId AND ue.Activo=1
+    JOIN importadora.Roles r ON r.Id=COALESCE(ue.RolId,u.RolId)
+    JOIN importadora.Empresas e ON e.Id=s.EmpresaId AND e.Activa=1
     WHERE s.TokenHash=@hash AND s.ExpiraEn>SYSUTCDATETIME() AND u.Estado='activo'`);
   const user = result.recordset[0];
   if (!user) return null;
@@ -40,7 +45,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   };
 }
 export function can(user: SessionUser, permission: string) {
-  return user.EsAdministrador || user.permissions.includes(permission);
+  return user.EsAdministradorSistema || user.EsAdministrador || user.permissions.includes(permission);
 }
 export async function requireUser(permission?: string) {
   const user = await currentUser();
@@ -52,13 +57,18 @@ export async function createSession(userId: number) {
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const pool = await db();
+  const account = await pool.request().input("user",sql.Int,userId).query("SELECT EsAdministradorSistema FROM importadora.Usuarios WHERE Id=@user AND Estado='activo'");
+  const company = account.recordset[0]?.EsAdministradorSistema
+    ? await pool.request().query("SELECT TOP 1 Id EmpresaId FROM importadora.Empresas WHERE Activa=1 ORDER BY Id")
+    : await pool.request().input("user",sql.Int,userId).query("SELECT TOP 1 EmpresaId FROM importadora.UsuarioEmpresas WHERE UsuarioId=@user AND Activo=1 ORDER BY EmpresaId");
   await pool
     .request()
     .input("hash", sql.Char(64), digest(token))
     .input("user", sql.Int, userId)
+    .input("company", sql.Int, company.recordset[0]?.EmpresaId ?? null)
     .input("expires", sql.DateTime2, expires)
     .query(
-      "INSERT importadora.Sesiones(TokenHash,UsuarioId,ExpiraEn) VALUES(@hash,@user,@expires)",
+      "INSERT importadora.Sesiones(TokenHash,UsuarioId,EmpresaId,ExpiraEn) VALUES(@hash,@user,@company,@expires)",
     );
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,

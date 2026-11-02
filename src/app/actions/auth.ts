@@ -85,7 +85,7 @@ export async function activateInvitation(_: FormState, data: FormData): Promise<
         .input("token", sql.Char(64), digest(token))
         .query(`UPDATE importadora.Usuarios SET PasswordHash=@hash,Estado='activo',ActualizadoEn=SYSUTCDATETIME() WHERE Id=@user;
           UPDATE importadora.InvitacionesUsuario SET UsadoEn=SYSUTCDATETIME() WHERE TokenHash=@token;
-          INSERT importadora.Auditoria(UsuarioId,Accion,EntidadId) VALUES(@user,'usuario.activacion',@user);`);
+          INSERT importadora.Auditoria(EmpresaId,UsuarioId,Accion,EntidadId) SELECT TOP 1 ue.EmpresaId,@user,'usuario.activacion',@user FROM importadora.UsuarioEmpresas ue WHERE ue.UsuarioId=@user ORDER BY ue.EmpresaId;`);
       await transaction.commit();
     } catch (error) {
       await transaction.rollback().catch(() => {});
